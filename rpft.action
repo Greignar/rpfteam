@@ -1,0 +1,140 @@
+#################################################################################
+# Purpose	:	Ad List for use with hosts files to block ads
+#
+# Arcady N Shpak aka Greignar
+#  url:     https://sites.google.com/site/rpfteam/
+#
+#################################################################################
+
+{{alias}}
+# These aliases define combinations of actions
+# that are useful for certain types of sites:
+app-content	= -filter +handle-as-empty-document -handle-as-image
+img-content	= -filter -handle-as-empty-document +handle-as-image
+txt-content	= +handle-as-empty-document -handle-as-image
+#############################################################################
+# Initial settings:
+#############################################################################
+{-deanimate-gifs \
+ -server-header-tagger{mime-control-m-u} \
+ -server-header-tagger{mime-control-s-u} \
+}
+/.*
+
+
+#############################################################################
+# The initial settings for content types:
+#############################################################################
+{app-content}
+TAG:m-application
+TAG:m-audio
+TAG:m-video
+{img-content}
+TAG:m-image
+{txt-content}
+TAG:m-text
+
+
+#############################################################################
+# Allow all cookies:
+#############################################################################
+{-crunch-incoming-cookies \
+ -crunch-outgoing-cookies \
+ -hide-referrer \
+ -session-cookies-only \
+}
+.4pda.ru/
+.blogger.com/
+.dns-shop.ru/
+.dropbox.com/
+.facebook.com/
+.geektimes.ru/
+.google.*/
+.habrahabr.ru/
+.livejournal.com/
+.mail.ru/
+.mega.nz/
+.ozon.ru/
+.ru-board.com/
+.technopoint.ru/
+.twitter.com/
+.unixforum.org/
+.wikipedia.org/
+.yandex.ru/
+.youtube.com/
+
+
+#############################################################################
+# No filter:
+#############################################################################
+{-filter \
+}
+
+
+#############################################################################
+# Redirectors:
+#############################################################################
+{+block{Redirectors} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Injectors:
+#############################################################################
+{+block{Injectors} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Trackers:
+#############################################################################
+{+block{Trackers} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Fraud:
+#############################################################################
+{+block{Fraud} \
+}
+
+
+#############################################################################
+# Banners Farm:
+#############################################################################
+{+block{Banner Farms} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Blocked Hosts:
+#############################################################################
+{+block{Hosts} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Blocked Hosts &  Path:
+#############################################################################
+{+block{Hosts &  Path} \
+ +handle-as-empty-document \
+}
+
+
+#############################################################################
+# Blocked Path:
+#############################################################################
+{+block{Path} \
+}
+
+
+#############################################################################
+# UnBlocked:
+#############################################################################
+{-block }
+

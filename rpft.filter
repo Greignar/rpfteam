@@ -1,0 +1,434 @@
+#################################################################################
+# Purpose   :  Rules to process the content of web pages
+#
+# Updated   :  2015/12/12 12:11:20
+#
+#              url: https://sites.google.com/site/rpfteam/
+#
+#################################################################################
+
+FILTER: not-filter +++++++++++++++ RPTF filters +++++++++++++++
+
+#################################################################################
+#
+# deanonymizing-server-headers-u
+#
+#################################################################################
+SERVER-HEADER-FILTER: deanonymizing-server-headers-u Block deanonymizing server headers
+s@^Last-Modified\:(.*$)@LM\:$1@i
+s@^LM\:(\s+\w{3},\s*\d+\s+\w{3}\s+\d+.*$)@Last-Modified:$1@i
+s@^LM\:(.*$)@@i
+s@^ETag\:(.*$)@@i
+
+
+#################################################################################
+#
+# deanonymizing-client-headers-u
+#
+#################################################################################
+CLIENT-HEADER-FILTER: deanonymizing-client-headers-u Block deanonymizing client headers
+s@^If-Modified-Since\:(.*$)@IMS\:$1@i
+s@^IMS\:(\s+\w{3},\s*\d+\s+\w{3}\s+\d+.*$)@If-Modified-Since:$1@i
+s@^IMS\:(.*$)@@i
+s@^ETag\:(.*$)@@i
+
+
+#################################################################################
+#
+# modify-browser-u
+#
+#################################################################################
+CLIENT-HEADER-FILTER: modify-browser-u Modify browser header
+s@^(User-Agent:\s+).*$@$1Mozilla/5.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0)@si
+
+
+#################################################################################
+#
+# mime-control-x-u Creates tags with the content of Content-Type headers 
+#
+##################################################################################
+
+SERVER-HEADER-TAGGER: mime-control-m-u Creates tags with the content of Content-Type headers. Type m-*.
+s@^Content-Type:\s*([^;/]+).*@m-$1@i   #application, audio, image, message, multipart, text, video
+
+SERVER-HEADER-TAGGER: mime-control-s-u Creates tags with the content of Content-Type headers. Type s-*.
+s@^Content-Type:\s*[^;/]+/(?:x-|)([^;]+).*@s-$1@i   #css, html, javascript, plain
+
+
+##################################################################################
+#
+# all-js: Kill all Scripts
+#
+#################################################################################
+FILTER: all-js-u Kill all Scripts
+s@(<script)[^>]*?(>.*?</script>)@$1 language="Blocked:all"$2@sig
+s@(<script[^>]*?)\s+src\s*=\s*(['"]?)(?:[^>'"\s]+)\2([^>]*?>)@$1 src=$2http://config.privoxy.org/send-banner?type=auto$2$3@sig
+
+
+##################################################################################
+#
+# nosey-js: Kill Nosy Scripts
+#
+#################################################################################
+FILTER: nosey-js-u Kill Nosy Scripts
+
+s@</(script)@\e</$1@sig
+s@(<script)[^>]*?(>[^\e]*?(\.(?:external|getHost|InetAddress|baseAddress)|(?:history|userProfile)\.))@\n<!--Script blocked by keyword: "$3" -->\n$1 language="blocked"$2@sig
+s@\e</(script)@</$1@sig
+
+#s@(<script)[^>]*?(>(?:(?!<\/script).)*?(\.(?:external|getHost|InetAddress|baseAddress)|(?:history|userProfile)\.))@\n<!--Script blocked by keyword: "$3" -->\n$1 language="blocked"$2@sig
+
+#################################################################################
+#
+# java-applets: Kill Java applets
+#
+#################################################################################
+FILTER: java-applets-u Kill Java applets
+s@<applet\s+([^>]*?)code\s*=\s*(["']?)[^>\s'"]+\2@<applet $1code=$2http://config.privoxy.org/send-banner?type=auto$2@sig
+
+
+#################################################################################
+#
+# javascript-ads-u Kill javascript ads
+#
+#################################################################################
+FILTER: javascript-ads-u Kill javascript ads (by keywords)
+
+# Mark end script tags
+s@</(script)@\e</$1@sig
+
+s@<script[^>]*>([^\e]*?(\
+ad(?:river|vmaker)|\
+(?:an|bs)\.yandex\.ru|\
+banner|\
+begun|\
+bin-layer|\
+counter\.yadro\.ru|\
+doubleclick|\
+getTracker|\
+google(?:_ad|-analytics|_render_ad|syndication)|\
+liveinternet|\
+Math\.random|\
+pink\.habralab|\
+pop(?:-|start|tr|un)|\
+tns-counter|\
+top\.(?:list|mail)\.ru\
+)[^\e]*?)\e</script>\s*(<noscript>.*?</noscript>|)\
+@\n<!--Script blocked by keyword: "$2" -->\n<script language="blocked">$1</script>\n<!--$3//-->@sig
+
+s@<script\s+[^>]*src=(['"]?)[^>\\\s\+'"]*(\
+(?:/|\.)ad(?:\d+|s|v)|\
+bann?er|\
+bin-layer|\
+count|\
+googlesyndication|\
+pop(?:-|start|tr|un|up)|\
+top\d+\
+)[^>\\\s'"]*\1[^>]*\
+@\n<!--Script blocked by keyword: "$2" -->\n<script src=$1http://config.privoxy.org/send-banner?type=auto$1@sig
+
+# Unmark end script tags
+s@\e</(script)@</$1@sig
+
+#s@<script(?:(?!<\/script).)*(adriver|banner|begun|doubleclick|getTracker|google_ad|google-analytics|google_render_ad|googlesyndication|liveinternet|pink\.habralab|tns-counter|top\.list\.ru|yadro\.ru|(?:an|bs)\.yandex\.ru)(?:(?!<\/script).)*?<\/script>@<!-- Blocked script: $1 -->@sigU
+
+
+#################################################################################
+#
+# Block extern contents
+#
+# script, a-img, img
+#
+#################################################################################
+
+FILTER: extern-js-u Block extern Scripts
+
+s@$host@-this-same-host-@sigD
+s@(<script\s+[^>]*?src\s*=\s*)(['"]?)((?:ftp|https?)://(?:(?!-this-same-host-)[^>'"\s])*)\2@$1$2http://config.privoxy.org/send-banner?type=auto$2@sig
+s@-this-same-host-@$host@sigD
+
+FILTER: extern-img-links-u Replace extern graphical links (<a..><img..></a>)
+
+s@$host@-this-same-host-@sigD
+s@(<a\s+[^>]+>)\s*<img\s+[^>]*?src\s*=\s*(['"]?)((?:ftp|https?)://(?:(?!-this-same-host-)[^>'"\s])*)\2[^>]*>\s*(</a>)@ <small>\[$1Link$4-<a href=$2$3$2 target=_blank>G</a>\]</small> @sig
+s@-this-same-host-@$host@sigD
+
+FILTER: extern-img-u Block extern graphical objects (<img..>)
+
+s@$host@-this-same-host-@sigD
+s@<img\s+[^>]*?src\s*=\s*(['"]?)((?:ftp|https?)://(?:(?!-this-same-host-)[^>'"\s])*)\1[^>]*>@ <small>\[Ext-<a href=$1$2$1 target=_blank>G</a>\]</small> @sig
+s@-this-same-host-@$host@sigD
+
+
+#################################################################################
+#
+# banners-by-element-name-css-u: Kill banners by element name (css)
+#
+#################################################################################
+FILTER: banners-by-element-name-css-u Kill Kill banners by element name (css)
+
+s@<(a|center|div|table|td|tr|span)\s+[^>]*(?:id|class)\s*=\s*(['"]?)(?:\
+[^a-z0-9]*ad(?:_|-|\d+|bar|begun|te?xt|v)|[^>'"\s\2]*(?:ad(?:s|v)[-_]+|ad(?:bar|begun|text|sense|vert)|ban(?:\d+|ner)|begun|ca(?:s|z)ino|dle-content|flash_ad|go-ad|ibm_adv|lfwar|ljad|marketgid|sup_ad|textAd|y5_market)\
+)[^>'"\s\2]*\2[^>]*@<$1 style="display:none !important"@sig
+
+
+##################################################################################
+#
+# img-reorder-u: Reorder attributes in <img...> tags to make the banners-by-* filters more effective
+#
+#################################################################################
+FILTER: img-reorder-u Reorder attributes in <img...> tags to make the banners-by-* filters more effective
+
+s@(<img)\s*([^>]*?)\s(height)\s*=\s*(['"]?)([^>'"\s]+)\4\s*@$1 $3=$4$5$4 $2 @sig
+s@(<img)\s*([^>]*?)\s(width)\s*=\s*(['"]?)([^>'"\s]+)\4\s*@$1 $3=$4$5$4 $2 @sig
+s@(<img)\s*([^>]*?)\s(src)\s*=\s*(['"]?)([^>'" ]+)\4\s*@$1 $3=$4$5$4 $2 @sig
+
+
+##################################################################################
+#
+# href-reorder-u: Reorder attributes in <a href...> tags to make the banners-by-* filters more effective
+#
+#################################################################################
+FILTER: href-reorder-u Reorder attributes in <a href...> tags to make the banners-by-* filters more effective
+
+s@(<a)(\s+[^>\+]+)(\s+href\s*=[^>\+]*)@$1$3$2@sig
+
+
+#################################################################################
+#
+# banners-by-size-u: Kill banners by size (img)
+#
+#################################################################################
+#
+# Note: Use img-reorder-u before this filter to ensure maximum matching success
+#
+#################################################################################
+FILTER: banners-by-size-u Kill banners by size (img)
+
+# 1*1
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)1\4)[^>]*?(height=(['"]?)1\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 88*31
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)88\4)[^>]*?(height=(['"]?)31\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 100|500*100
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)(?:100|500)\4)[^>]*?(height=(['"]?)100\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 120*60|90|240
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)120\4)[^>]*?(height=(['"]?)(?:60|90|240)\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 120|160|300*600
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)(?:120|160|300)\4)[^>]*?(height=(['"]?)600\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 125*125
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)125\4)[^>]*?(height=(['"]?)125\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 180*150
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)180\4)[^>]*?(height=(['"]?)150\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 234|468*60
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)(?:234|468)\4)[^>]*?(height=(['"]?)60\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 240*400
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)240\4)[^>]*?(height=(['"]?)400\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 250|300*250
+s@<img\s+(?:src*=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)(?:250|300)\4)[^>]*?(height=(['"]?)250\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 336*280
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)336\4)[^>]*?(height=(['"]?)280\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+# 600|728*90
+s@<img\s+(?:src=(['"]?)([^>\\\1\s]+)\1)?[^>]*?(width=(['"]?)(?:600|728)\4)[^>]*?(height=(['"]?)90\6)[^>]*?(?=/?>)@\
+  <img src="http://config.privoxy.org/send-banner?type=auto" border="0" title="Killed-$2-by-size" $3 $5@sig
+
+
+#################################################################################
+#
+# banners-by-link-u: Kill banners by their links to known clicktrackers (Experimental).
+#
+#################################################################################
+FILTER: banners-by-link-u Kill banners by their links to known clicktrackers
+
+# Kill HTML banners by their links
+s@(<a\s+[^>\+]*href\s*=\s*(['"]?)[^>'"\\\s\+\2]*(?:\
+[^a-z0-9]ad[sv]?(?:[^a-z0-9]|\d+|banner|click|cycle|frame|fu|log|name|serve|x|ver|ult)\
+|(?:acc_random|_to|Ctx|banner|clic?k|count|offer|run|s(?:ite|eed|ource|ubproduct)|pal)(?:_|)(?:id|)=\
+|(?:double|ad|log_)click\
+|(?:hot|spy)log\
+|ngadclient\
+|phpads\
+|promo\
+|r\.mail\.\
+|re(?:c|k)lamm?a\
+|redir\
+|ref_id=\
+|rotator\
+|spons\
+|top[\d\./cs]\
+|track\
+|u(?:h|s)k?i\
+|webconnect\.dll\
+)[^>'"\\\s\2]*\2[^>\+]*>)\s*(<img\s+[^>\+]*src\s*=\s*)(['"]?)[^>'"\s\+\4]*\4\
+@$1$3$2http://config.privoxy.org/send-banner?type=auto$2@sig
+
+
+#################################################################################
+#
+# banners-by-link-css-u: Kill banners by their links to known clicktrackers (Experimental).
+#
+#################################################################################
+FILTER: banners-by-link-css-u Kill banners by their links to known clicktrackers
+
+# Kill HTML banners by their links
+s@(<a\s+[^>\+]*href\s*=\s*(['"]?)[^>'"\\\s\+\2]*(?:\
+[^a-z0-9]ad[sv]?(?:[^a-z0-9]|\d+|banner|click|cycle|frame|fu|log|name|serve|x|ver|ult)\
+|(?:acc_random|_to|Ctx|banner|clic?k|count|offer|run|s(?:ite|eed|ource|ubproduct)|pal)(?:_|)(?:id|)=\
+|(?:double|ad|log_)click\
+|(?:hot|spy)log\
+|ngadclient\
+|phpads\
+|promo\
+|r\.mail\.\
+|re(?:c|k)lamm?a\
+|redir\
+|ref_id=\
+|rotator\
+|spons\
+|top[\d\./cs]\
+|track\
+|u(?:h|s)k?i\
+|webconnect\.dll\
+)[^>'"\\\s\+\2]*\2[^>\+]*>)\s*(<img\s+.*?(?=/?>))\
+@$1$3 style=$2display:none !important$2@sig
+
+
+#################################################################################
+#
+# all-images: Remove all images
+#
+#################################################################################
+FILTER: all-images-u Remove all images
+
+s@<img\s+(?:src\s*=\s*(['"]?)([^>'"\s\+]+))\1([^>\+]*)>@<img src=$1http://config.privoxy.org/send-banner?type=auto$1 title="all-images url=$2" $3>@sig
+
+
+#################################################################################
+#
+# kill-hidden-frames: Remove hidden Frame tags
+#
+#################################################################################
+FILTER: hidden-frames-u Remove hidden Frame tags
+
+# Remove hidden Frame tags
+s@<iframe\s+([^>]*)\s+src\s*=\s*(['"]?)([^>'"\\\s]+)\2@<iframe src=$2$3$2 $1@sig
+s@<iframe\s+(src=(['"]?)[^>'"\\\s]+\2)([^>]*)\s+height\s*=\s*(["']?)((?:-|)\d+)\4@<iframe $1 height=$4$5$4$3@sig
+s@<iframe\s+(src=(['"]?)[^>'"\\\s\3]+\2)([^>]*)\s+width\s*=\s*(["']?)((?:-|)\d+)\4@<iframe $1 width=$4$5$4$3@sig
+
+s@<iframe\s+src=((['"]?)[^>\s'"]+\2)[^>]*(?:width|height)=(['"]?)(?:-|)0*([0..1])\3[^>]*>.*?<\/iframe>@<a href=$1>[Hidden-iFrame]</a>@sig
+
+
+#################################################################################
+#
+# open-link-in-self-frame: Open links in the self frame
+#
+#################################################################################
+FILTER: open-link-in-self-frame-u Open links in the self frame
+
+s@(<a\s+[^>\+]*?\s*)target\s*=\s*(['"]?)_blank\2([^>\+]*?>)@$1target=$2_self$2$3@sig
+
+
+#################################################################################
+#
+# shockwave-flash-u: Kill embedded Shockwave Flash objects
+#
+#################################################################################
+FILTER: shockwave-flash-u Kill embedded Shockwave Flash objects.
+
+s@</(object)@\e</$1@sig
+s@<object\s+[^>]*macromedia[^\e]*\e</object>@SWF-Object@sig
+s@\e</(object)@</$1@sig
+
+s@<embed\s+[^>]*(?:application/x-shockwave-flash|\.swf).*?>(.*?</embed>)?@SWF-Embed@sig
+s@<embed\s+[^>]*(?:application/x-shockwave-flash|\.swf)[^>]*>@SWF-Embed@sig
+
+
+#################################################################################
+#
+# shockwave-flash-u: Kill embedded Shockwave Flash objects
+#
+#################################################################################
+FILTER: shockwave-flash-banners-u Kill embedded Shockwave Flash banners.
+
+s@</(object)@\e</$1@sig
+s@<object\s+[^>\+]*http://[^\e\s\+'"]*(\
+[^a-z0-9]ad[sv]?(?:[^a-z0-9]|\d+|banner|click|cycle|frame|fu|log|name|serve|x|ver|ult)|\
+banner|\
+glavmed|\
+promo\
+)[^\e\+]*\e</object>@\n<!--Object blocked by keyword: "$1" -->\nSWF-Banner@sig
+s@\e</(object)@</$1@sig
+
+s@<embed\s+[^>\+]*http://[^\s\+'">]*(?:ads|banner|glavmed|promo).*?>(?:|.*?</embed>)@SWF-Banner@sig
+
+
+#################################################################################
+#
+# site-bugs: Cure for site-specific problems.
+#
+#################################################################################
+FILTER: site-bugs-u Cure for site-specific problems.
+
+# Removal of automatic loading of images
+s@new\s+Image\(\s*\)@old image()@sig
+
+
+#################################################################################
+#
+# Block forum signatures
+#
+#################################################################################
+FILTER: forum-signatures-u Block forum signatures
+
+
+#vBulletin
+s@>\s*__________________\s*(<br)@ style="display:none">$1@sig
+s@<!-- sig -->.*?<!-- / sig -->@@sig
+
+#phpBB
+s@(<div\s+id="sig\d+"\s+class="signature")@$1 style="display:none"@sig
+
+#IP.Board
+s@(<!--IBF\.ATTACHMENT_\d+.*?)(<div\s+class="signature")@$1$2 style="display:none"@sig
+
+#Ikonboard
+s@(<table\s+align=left\s+class=sing)(>\s*<tr>\s*<td colspan=2>----------<br>)@$1 style="display:none"$2@sig
+
+#SMF
+s@(<hr\s+width="100%"[^\>]+>\s*<div\s+class="signature")@$1 style="display:none"@sig
+
+
+FILTER: not-filter +++++++++++++++ Site specific filters +++++++++++++++
+
+
+FILTER: habrahabr-ads-u Habrehabr specific filters
+s@(<div\s+(?:id="topline"|class="(?:banner[^"]+|block\s+(?:best_company|windows_phone_htmlblock))"))@$1 style="display:none !important"@ig
+
+
+FILTER: letitbit-net-popup-u Block letitbit.net popup
+# letitbit.net popup
+s|(\{)[^\}]+window\.open\s*\([^\}]*advstat\.letitbit\.net[^\}]*(\})|$1 return true; $2|si
+
+
+FILTER: not-filter +++++++++++++++++++++++++++++++++++++++++++++++++++++
